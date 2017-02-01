@@ -1,0 +1,19 @@
+Anjali Pemmaraju
+Winter 2017
+Professor Eggert
+CS 111
+
+lab0 README
+
+lab0.c : includes the source code for copying content from input to output, and catching segmentation fault error. Uses getopt_long to take in inputs from --input --output --segfault and --catch flags. Writes to STDIN and STDOUT unless input and output are specified. Copying is done using read and write commands, performed on one byte at a time. Performs segmentation fault by trying to assign a value to a null pointer as specified. Catch will catch segfault by using signal() and will exit this way.
+
+Makefile: make (default) compiles executable using gcc 
+	  make check: checks that input and output copied are same, and that exits with proper codes given the following errors: input file not readable, output file not writable, catch segmentation fault, input file does not exist
+	  make dist: makes tarball of the specified files
+	  make clean: removes any files made while using make command
+
+README: contains information about the project
+
+screenshotbacktrace.png: contains screenshot showing stack backtrace when lab0 executable run with a segmentation fault, 
+
+screenshotnullptr.png: contains screenshot showing that a segmentation fault would occur because the pointer is null - located at null pointer address and by deferencing says that memory at that address cannot be accessed. Broke at this line by first running the program without a break and seeing where it broke in gdb. 
