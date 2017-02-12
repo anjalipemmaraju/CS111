@@ -1,0 +1,407 @@
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <getopt.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+
+//check verbose with many flags
+
+void signal_handler(int signum)
+{
+  fprintf(stderr, "%d caught", signum);
+  exit(signum);
+}
+
+
+
+int main (int argc, char ** argv)
+{
+
+  int c = 0;
+  int verbose_flag = 0;
+  int append_flag = 0;
+  int cloexec_flag = 0;
+  int creat_flag = 0;
+  int directory_flag = 0;
+  int dsync_flag = 0;
+  int excl_flag = 0;
+  int nofollow_flag = 0;
+  int nonblock_flag = 0;
+  int rsync_flag = 0;
+  int sync_flag = 0;
+  int trunc_flag = 0;
+  pid_t pid[argc];				       
+  int wait_flag = 0;
+  struct timeval userstart;
+  struct timeval userend;
+  struct timeval kernelstart;
+  struct timeval kernelend;
+  struct rusage u;
+  double utime = 0;
+  double ktime = 0;
+  double totaltime = 0;
+  char*** buff = malloc(sizeof(char**));
+  int profile_flag = 0;// what size should i make this
+  struct option longopts[] =
+    {
+      {"rdonly", required_argument, 0, 'r' },
+      {"wronly", required_argument, 0,'w'},
+      {"verbose", no_argument, &verbose_flag, 1},
+      {"command", no_argument, 0, 'm'},
+      {"append", no_argument, &append_flag, 1},
+      {"cloexec", no_argument, &cloexec_flag, 1},
+      {"creat", no_argument, &creat_flag, 1},
+      {"directory", no_argument, &directory_flag, 1},
+      {"dsync", no_argument, &dsync_flag, 1},
+      {"excl", no_argument, &excl_flag, 1},
+      {"nofollow", no_argument, &nofollow_flag, 1},
+      {"nonblock", no_argument, &nonblock_flag, 1},
+      {"rsync", no_argument, &rsync_flag, 1},
+      {"sync", no_argument, &sync_flag, 1},
+      {"trunc", no_argument, &trunc_flag, 1},
+      {"rdwr", required_argument, 0, 'f'},
+      {"catch", required_argument, 0, 'z'},
+      {"abort", no_argument, 0, 'a'},
+      {"ignore", required_argument, 0, 'i'},
+      {"default", required_argument, 0, 'd'},
+      {"pause", no_argument, 0, 'u'},
+      {"pipe", no_argument, 0, 'p'},
+      {"close", required_argument, 0, 'q'},
+      {"wait", no_argument, &wait_flag, 1},
+      {"profile", no_argument, &profile_flag, 1},
+      {0, 0, 0, 0}    
+    };
+
+  int ief = 0;
+  for (ief ; ief < argc; ief++)
+    {
+      pid[ief] = 0;
+    }
+  ief = 0;
+  char* inputfile = NULL;
+  char* writefile = NULL;
+  char* rwfile = NULL;
+  int fileds[2*argc];
+  int numfiles = 0;
+  int tem[2];
+  struct timeval childstart;
+  struct timeval childkstart;
+  struct timeval childend;
+  struct timeval childkend;
+  struct rusage children;
+  while ((c = getopt_long (argc, argv, "p:ud:i:az:r:w:f:m", longopts, 0)) != -1)
+    {
+      char* option = NULL;
+      getrusage(RUSAGE_SELF, &u);
+      userstart = u.ru_utime;
+      kernelstart = u.ru_stime;
+      getrusage(RUSAGE_CHILDREN, &children);
+      childstart = children.ru_utime;
+      childkstart = children.ru_stime;
+      switch (c)
+	{
+	case 'q':
+	  {
+	    int index = atoi(optarg);
+	    int fd = fileds[index];
+	    close(fd);
+	    option = "Close ";
+	    break;
+	  }
+	case 'p':
+	  {
+	    int rr = pipe(tem);
+	    if (rr == -1)
+	      {
+		fprintf(stderr, "error making pipe");
+	      }
+	    fileds[numfiles] = tem[0];
+	    numfiles++;
+	    fileds[numfiles] = tem[1];
+	    numfiles++;
+	    if (verbose_flag)
+	      {
+		printf("--pipe");
+	      }
+	    option = "Pipe ";
+	    break;
+	  }
+	case 'u':
+	  {
+	    if (verbose_flag)
+	      {
+		printf("--pause");
+	      }
+	    pause();
+	    option = "Pause ";
+	    break;
+	  }
+	case 'd':
+	  {
+	    if (verbose_flag)
+	      {
+		printf("--default ");
+		printf("%s", optarg);
+	      }
+	    int ar = atoi(optarg);
+	    option = "Default ";
+	    signal(ar, SIG_DFL);
+	    break;
+	  }
+	case 'i':
+	  {
+	    if (verbose_flag)
+	      {
+		printf("--ignore ");
+		printf("%s", optarg);
+	      }
+	    option = "Ignore ";
+	    int ar = atoi(optarg);
+	    signal(ar, SIG_IGN);
+	    break;
+	  }
+	case 'a':
+	  {
+	    option = "Segfault ";
+	    char* nu  = NULL;
+	    int a = *nu;
+	    break;
+	  }
+	case 'z':
+	  {
+	    option = "Catch ";
+	    int ar = atoi(optarg);
+	    signal(ar, signal_handler);
+	    break;
+	  }
+	case 'r':
+	  {
+	    option = "Read Only ";
+	    inputfile = optarg;
+	    int ifd = open(inputfile, O_RDONLY|append_flag*O_APPEND|cloexec_flag*O_CLOEXEC|creat_flag*O_CREAT|directory_flag*O_DIRECTORY|dsync_flag*O_DSYNC|excl_flag*O_EXCL|nofollow_flag*O_NOFOLLOW|nonblock_flag*O_NOFOLLOW|rsync_flag*O_RSYNC|sync_flag*O_SYNC|trunc_flag*O_TRUNC, 0644);
+	    fileds[numfiles] = ifd;
+	    numfiles = numfiles + 1;
+	    if (verbose_flag == 1)
+	      {
+		write(1, "--rdonly ", 9);
+		int length = strlen(inputfile);
+		write(1, inputfile, length);
+		write(1, "\n", 1);
+	      }
+	    break;
+	  }
+	case 'w':
+	  {
+	    option = "Write Only ";
+	    writefile = optarg;
+	    int ofd = open(writefile, O_WRONLY|append_flag*O_APPEND|cloexec_flag*O_CLOEXEC|creat_flag*O_CREAT|directory_flag*O_DIRECTORY|dsync_flag*O_DSYNC|excl_flag*O_EXCL|nofollow_flag*O_NOFOLLOW|nonblock_flag*O_NOFOLLOW|rsync_flag*O_RSYNC|sync_flag*O_SYNC|trunc_flag*O_TRUNC, 0644);
+	    // int ofd = open(writefile, O_WRONLY);
+	    fileds[numfiles] = ofd;
+	    numfiles = numfiles + 1;
+	    if (verbose_flag ==1)
+	      {
+		printf("--wronly ");
+		printf("%s\n", optarg);
+	      }
+	    break;
+	  }
+	case 'f':
+	  {
+	    {
+	    option = "Read Write ";
+	    rwfile = optarg;
+	    int ofd = open(rwfile, O_RDWR|append_flag*O_APPEND|cloexec_flag*O_CLOEXEC|creat_flag*O_CREAT|directory_flag*O_DIRECTORY|dsync_flag*O_DSYNC|excl_flag*O_EXCL|nofollow_flag*O_NOFOLLOW|nonblock_flag*O_NOFOLLOW|rsync_flag*O_RSYNC|sync_flag*O_SYNC|trunc_flag*O_TRUNC);
+	    // int ofd = open(writefile, O_WRONLY);
+	    fileds[numfiles] = ofd;
+	    numfiles = numfiles + 1;
+	    if (verbose_flag ==1)
+	      {
+		printf("--rdwr ");
+		printf("%s\n", optarg);
+	      }
+	    break;
+	  }
+	case 'm':
+	  {
+	    int start;
+	    start = optind;
+     	    char* s;
+	    int index = 0;
+	    char** params = malloc(argc*sizeof(char*));
+	    while (optind < argc)
+	      {
+		s = argv[optind];
+		if (strlen(s) > 1 && s[0] == '-' && s[1] == '-')
+		  {
+		    break;
+		  }
+		params[index] = s;
+		index = index + 1;
+		optind = optind + 1;
+	      }
+	    params[index] = NULL;
+	    start = 1;
+	    if (verbose_flag == 1)
+	      {
+		char* printout = "--command ";
+		write(1, "--command ", strlen("--command "));
+		while (start < index && strcmp(params[start], ">") != 0 && strcmp(params[start], "<") != 0)
+		  {
+		    int length = strlen(params[start]);
+		    write (1, params[start], length);
+		    write(1, " ", 1);
+		    start = start + 1;
+		  }
+		write(1, "\n", 1);
+	      }
+
+	     
+	    int in = atoi(params[0]);
+	    int out = atoi(params[1]);
+	    int err = atoi(params[2]);
+	    //execvp(params[3], &params[3]);
+	    //	    execute(params);
+	    int    status = 0;
+
+
+	    buff[ief] = &params[3];
+	    pid[ief] = fork();
+	    option = params[3];
+	    int aa = 0;
+	    if (pid[ief] < 0) {    
+	      printf("*** ERROR: forking child process failed\n");
+	      exit(1);
+	    }
+	      //close all files HERE
+	    
+	    else if (pid[ief] == 0) {
+
+	      if (dup2(fileds[in], 0) == -1)
+		fprintf(stderr, "call dup2fail 1");
+	      if (dup2(fileds[out], 1) == -1)
+		fprintf(stderr, "call dup2fail 2");
+	      
+	      if (dup2(fileds[err], 2) == -1)
+		fprintf(stderr, "call dup2fail 3");
+	      
+	      
+	      for (aa; aa < numfiles; aa++)
+		{
+		  close(fileds[aa]);
+		}
+	      if (execvp(params[3], &params[3]) < 0) { 
+		printf("*** ERROR: exec failed\n");
+		exit(1);
+	      }
+	    }
+	    else
+	      {
+		ief++;
+	      }
+	      
+	      break;
+	    }
+	  }
+	} // end of switch
+      if (profile_flag)
+	{
+	  if (option != NULL && getrusage(RUSAGE_SELF, &u) != -1)
+	    {
+	      userend = u.ru_utime;
+	      kernelend = u.ru_stime;
+	      double usertime = ((double)userend.tv_sec + (double)userend.tv_usec/1000000)-((double)userstart.tv_sec + (double)userstart.tv_usec/1000000);
+	      utime += usertime;	  
+	      double kerneltime = ((double)kernelend.tv_sec + (double)kernelend.tv_usec/1000000)-((double)kernelstart.tv_sec + (double)kernelstart.tv_usec/1000000);
+	      ktime += kerneltime;
+	      //	      double total = usertime + kerneltime;
+	      //totaltime += total;
+	      fprintf(stdout, "\n%s - User Time: %f, Kernel Time: %f", option, usertime, kerneltime);
+	      option = NULL;
+	    }
+	}
+    
+    }
+  
+  if(wait_flag)
+    {
+      int aa = 0;
+      for (aa; aa < numfiles; aa++)
+	{
+	  close(fileds[aa]);
+	}
+      int done[ief];
+      int qq;
+      int check = 0;
+      int status;
+      for (qq = 0; qq < ief; qq++)
+	{
+	  done[qq] = 0;
+	}
+      fprintf(stdout, "%d", ief);
+      while (check != ief)
+	{
+	  for (qq = 0; qq < ief; qq++)
+	    {
+	      if (done[qq] == 0)
+		if (waitpid(pid[qq], &status, WNOHANG)!= 0)
+		  {
+		    done[qq] = 1;
+		    check++;
+		    char** toprint = buff[qq];
+		    int j;
+		    for (j = 0; buff[qq][j] != NULL; j++)
+		      {
+			printf("\n%d ", WEXITSTATUS(status));
+			printf("%s ", buff[qq][j]);
+		      }
+		    fprintf(stdout, "\n");
+		  } 
+	    }
+	}
+      if (profile_flag == 1)
+	{
+	  char* option = "WAIT";
+	  struct rusage children;
+	  
+	  getrusage(RUSAGE_CHILDREN, &children);
+	  childend = children.ru_utime;
+	  childkend = children.ru_stime;
+	  double usertime = ((double)childend.tv_sec + (double)childend.tv_usec/1000000)-((double)childstart.tv_sec + (double)childstart.tv_usec/1000000);
+	  utime += usertime;	  
+	  double kerneltime = ((double)childkend.tv_sec + (double)childkend.tv_usec/1000000)-((double)childkstart.tv_sec + (double)childkstart.tv_usec/1000000);
+	  ktime += kerneltime;
+	  //double total = usertime + kerneltime;
+	  //totaltime += total;
+	  //totaltime = ktime + utime;
+	  fprintf(stdout, "\n%s - User Time: %f, Kernel Time: %f", option, usertime, kerneltime);
+	  
+	}
+    }
+    if (profile_flag == 1)
+	{
+	  if (getrusage(RUSAGE_SELF, &u) != -1)
+	    {
+	      userend = u.ru_utime;
+	      kernelend = u.ru_stime;
+	      double usertime = ((double)userend.tv_sec + (double)userend.tv_usec/1000000)-((double)userstart.tv_sec + (double)userstart.tv_usec/1000000);
+	      utime += usertime;	  
+	      double kerneltime = ((double)kernelend.tv_sec + (double)kernelend.tv_usec/1000000)-((double)kernelstart.tv_sec + (double)kernelstart.tv_usec/1000000);
+	      ktime += kerneltime;
+	      //double total = usertime + kerneltime;
+	      //totaltime += total;
+	      //totaltime = ktime + utime;
+	      fprintf(stdout, "\nTotal User Time: %f, Total Kernel Time: %f", utime, ktime);
+	    }
+	}
+    
+
+}

@@ -1,0 +1,2 @@
+This is my implementation of lab1b for cs111 taught by Professor Eggert in Winter 2017.
+There are no known limitations although I have not fully implemented verbose since the test cases do not appear to test verbose for this section at this moment.

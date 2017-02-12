@@ -1,0 +1,65 @@
+files = simpsh* Makefile README report.pdf
+
+default:
+	gcc -o simpsh simpsh.c
+check: default tests
+	if [[ -s bad.txt ]]; then \
+	  echo "Failed"; \
+	  cat bad.txt; \
+	  rm -f bad.txt; \
+	else \
+	  echo "All tests passed."; \
+	fi 
+clean: 
+	rm simpsh
+	rm -r lab1-anjalipemmaraju*
+
+dist: 	default check
+	mkdir lab1-anjalipemmaraju	
+	cp $(files) lab1-anjalipemmaraju
+	tar -czf lab1-anjalipemmaraju.tar.gz lab1-anjalipemmaraju
+	rm -r lab1-anjalipemmaraju
+tests:
+
+	echo "hello world" > a; \
+	./simpsh --command 0 1 2 cat a > b; \
+	diff a b; \
+	if [[ $$? -ne 0 ]]; then \
+	echo "Error: command doesn't work properly" >> bad.txt; \
+	fi; \
+	rm -f a b; \
+	echo "Hello World" > a; \
+	echo "Hello World" > b; \
+	./simpsh --rdonly a > /dev/null 2>&1; \
+	diff a b; \
+	if [[ $$? -ne 0 ]]; then \
+	echo "Error: rdonly doesn't work properly" >> bad.txt; \
+	fi; \
+	rm -f a b; \
+	echo "hello" > a;
+	echo "hello" > b;
+	./simpsh --wronly a > /dev/null 2>&1; \
+	diff a b; \
+	if [[ $$? -ne 0 ]]; then \
+	echo "Error: wronly doesn't work properly" >> bad.txt; \
+	fi; \
+	rm -f a b;
+	echo "A" > a.txt; \
+	echo "A" > check.txt; \
+	echo "P" >> check.txt;
+	echo "P" > c.txt; \
+	./simpsh --rdonly c.txt --append --wronly a.txt --creat --wronly error.txt --command 0 1 2 cat > /dev/null 2>&1; \
+	diff a.txt check.txt; \
+	if [[ $$? -ne 0 ]]; then \
+	echo "Error: append flag doesn't work properly" >> bad.txt; \
+	fi; \
+	rm -f a.txt check.txt c.txt error.txt;  \
+#	echo "A" > r.txt; \
+#	echo "A" > check.txt; \
+#	echo "A" >> check.txt; \
+#	./simpsh --rdwr r.txt --creat --wronly error.txt --command 0 0 1 cat > /dev/null 2>&1; \
+#	diff check.txt r.txt; \
+#	if [[ $$? -ne 0 ]]; then \
+#	echo "Error: rdwr doesn't work properly" >> bad.txt; \
+#	fi; \
+#	rm -f check.txt r.txt error.txt;
